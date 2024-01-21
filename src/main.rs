@@ -6,11 +6,25 @@ use std::path::Path;
 use clap::{Parser, ValueEnum};
 
 
+const BANNAR: &str = r#"
+ ███▄ ▄███▓ ▄▄▄       ██▀███   ▄████▄   ▒█████  
+▓██▒▀█▀ ██▒▒████▄    ▓██ ▒ ██▒▒██▀ ▀█  ▒██▒  ██▒
+▓██    ▓██░▒██  ▀█▄  ▓██ ░▄█ ▒▒▓█    ▄ ▒██░  ██▒
+▒██    ▒██ ░██▄▄▄▄██ ▒██▀▀█▄  ▒▓▓▄ ▄██▒▒██   ██░
+▒██▒   ░██▒ ▓█   ▓██▒░██▓ ▒██▒▒ ▓███▀ ░░ ████▓▒░
+░ ▒░   ░  ░ ▒▒   ▓▒█░░ ▒▓ ░▒▓░░ ░▒ ▒  ░░ ▒░▒░▒░ 
+░  ░      ░  ▒   ▒▒ ░  ░▒ ░ ▒░  ░  ▒     ░ ▒ ▒░ 
+░      ░     ░   ▒     ░░   ░ ░        ░ ░ ░ ▒  
+       ░         ░  ░   ░     ░ ░          ░ ░  
+                              ░                 
+"#;
+
+
 #[derive(ValueEnum, Clone, Debug, Default)]
 enum CleanType {
-    VirusScan,
+    Virus,
     #[default]
-    CleanCache
+    Cache
 }
 
 
@@ -58,7 +72,9 @@ fn virus_scan(file_path: &Path) -> Result<(), io::Error> {
         println!("File {} is infected! Deleting...", file_path.display());
         if get_confirm()? { 
             println!("Deleted: {}", file_path.display());
-            fs::remove_file(file_path)?; 
+            if let Err(e) = fs::remove_file(file_path) {
+                eprintln!("{}", e);
+            }
         }
     } else {
         println!("File {} is clean.", file_path.display());
@@ -77,8 +93,10 @@ fn scan_dir(path: &Path, r#type: &CleanType) -> Result<(), io::Error> {
 
         if path.is_file() {
             match r#type {
-                CleanType::VirusScan => virus_scan(&path)?,
-                CleanType::CleanCache => fs::remove_file(&path)?
+                CleanType::Virus => virus_scan(&path)?,
+                CleanType::Cache => if let Err(e) = fs::remove_file(&path) {
+                    eprintln!("{}", e);
+                }
             }
         } else if path.is_dir() {
             scan_dir(&path, r#type)?;
@@ -90,17 +108,17 @@ fn scan_dir(path: &Path, r#type: &CleanType) -> Result<(), io::Error> {
 
 fn init(user: &str, r#type: &CleanType, scan: Option<&Path>) -> Result<(), io::Error> {
     match r#type {
-        CleanType::CleanCache => {
+        CleanType::Cache => {
             let [cache_dir, temp_dir, more_temp_dir] = get_cache_paths(&user);
 
-            scan_dir(&Path::new(&cache_dir), &CleanType::CleanCache)?;
-            scan_dir(&Path::new(&temp_dir), &CleanType::CleanCache)?;
-            scan_dir(&Path::new(&more_temp_dir), &CleanType::CleanCache)?;
+            scan_dir(&Path::new(&cache_dir), &CleanType::Cache)?;
+            scan_dir(&Path::new(&temp_dir), &CleanType::Cache)?;
+            scan_dir(&Path::new(&more_temp_dir), &CleanType::Cache)?;
         },
-        CleanType::VirusScan => {
+        CleanType::Virus => {
             if let Some(path) = scan { 
                 if path.is_dir() {
-                    scan_dir(&path, &CleanType::VirusScan)?;
+                    scan_dir(&path, &CleanType::Virus)?;
                 } else if path.is_file() {
                     virus_scan(&path)?;
                 }
@@ -113,28 +131,19 @@ fn init(user: &str, r#type: &CleanType, scan: Option<&Path>) -> Result<(), io::E
 
 
 fn main() -> Result<(), io::Error> {
-    // if cfg!(target_os = "windows") {
-    //     let mut res = winres::WindowsResource::new();
-    //     res
-    //         .set_icon("../res/soap-and-sanitizer.svg")
-    //         .set("InternalName", "wash.exe")
-    //         .set_version_info(winres::VersionInfo::PRODUCTVERSION, 0x0001000000000000);
-    //     res.compile()?;
-    // }
+    println!("{}", BANNAR);
 
     let Args { r#type, scan } = Args::parse();
     let user = whoami::username();
 
-    println!("{}", user);
-
     match r#type {
-        CleanType::VirusScan => {
+        CleanType::Virus => {
             println!("Virus scan...");
-            if let Some(scan) = scan { init(&user, &CleanType::VirusScan, Some(&Path::new(&scan)))? }
+            if let Some(scan) = scan { init(&user, &CleanType::Virus, Some(&Path::new(&scan)))? }
         },
-        CleanType::CleanCache => {
+        CleanType::Cache => {
             println!("Clean cache...");
-            init(&user, &CleanType::CleanCache, None)?
+            init(&user, &CleanType::Cache, None)?
         }
     }
 
